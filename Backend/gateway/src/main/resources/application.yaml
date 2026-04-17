@@ -1,0 +1,38 @@
+server:
+  port: 8081 # The Gateway runs on a different port!
+
+spring:
+  application:
+    name: flashtix-gateway
+  data:
+    redis:
+      host: localhost
+      port: 6379
+
+  cloud:
+    gateway:
+
+      globalcors:
+        cors-configurations:
+          '[/**]':
+            allowedOrigins: "http://localhost:5173"
+            allowedHeaders: "*"
+            allowedMethods:
+              - GET
+              - POST
+              - PUT
+              - DELETE
+              - OPTIONS
+
+      routes:
+        - id: flashtix-monolith
+          uri: http://localhost:8080 # Points to your main backend
+          predicates:
+            - Path=/api/** # Intercepts all API calls
+          filters:
+            - name: RequestRateLimiter
+              args:
+                redis-rate-limiter.replenishRate: 2 # How many new requests allowed per second
+                redis-rate-limiter.burstCapacity: 5 # Maximum sudden burst allowed
+                redis-rate-limiter.requestedTokens: 1 # Cost per request
+                key-resolver: "#{@ipKeyResolver}" # How we identify the user (by IP)
