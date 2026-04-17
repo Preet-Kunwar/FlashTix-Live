@@ -1,6 +1,6 @@
 # 🎟️ FlashTix Live
 
-### ⚡ Real-Time Ticketing Platform with API Gateway & Rate Limiting
+### ⚡ Real-Time Ticketing Platform 
 
 <p align="center">
   <em>High-performance distributed system designed for extreme flash-sale traffic</em>
