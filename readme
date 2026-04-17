@@ -1,141 +1,90 @@
 🎟️ FlashTix Live
-⚡ Real-Time Ticketing Platform with API Gateway & Rate Limiting
+⚡ Real-Time Ticketing Platform 
+<p align="center"> <em>High-performance distributed system built for extreme flash-sale traffic</em> </p>
+🚀 Overview
 
-FlashTix is a high-performance, distributed ticketing system designed for handling extreme flash-sale traffic without downtime, data loss, or API overload.
+FlashTix is a scalable, event-driven ticketing platform designed to handle massive concurrent users during flash sales.
 
-It combines:
+It ensures:
 
-🧠 Event-driven architecture
-🚪 API Gateway with rate limiting
-⚡ Real-time updates
-🔄 Asynchronous processing
+⚡ Instant response (no API blocking)
+🔒 Zero data loss
+🌐 Real-time updates across all users
+🛡️ System stability under heavy load
+✨ Core Features
+🚪 API Gateway with Rate Limiting (prevents overload)
+🧠 Event-Driven Architecture using Kafka
+⚡ Real-Time Updates via WebSockets
+🔄 Asynchronous Order Processing
+🛡️ Fault Tolerance with Circuit Breaker
+📄 Background PDF Ticket Generation
+📦 Object Storage (MinIO)
 🏗️ System Architecture
-
-<p align="center"> <img src="./asserts/System-Architecture.png" width="850"/> <br/> <em>FlashTix Distributed Architecture with Gateway, Kafka, Redis, RabbitMQ, and MinIO</em> </p>
-🚪 API Gateway (NEW 🔥)
-
-FlashTix uses a dedicated API Gateway layer built with:
-
-Spring Cloud Gateway
-Redis (for rate limiting)
-⚡ Why Gateway?
-Centralized routing
-Security enforcement
-Rate limiting (prevents system crash during flash sales)
-Load control before hitting backend services
-🛡️ Rate Limiting Strategy
-
-Your gateway implements IP-based rate limiting:
-
-@Bean
-public KeyResolver ipKeyResolver() {
-return exchange -> Mono.just(
-exchange.getRequest().getRemoteAddress().getAddress().getHostAddress()
-);
-}
-
-📌 Meaning:
-
-Each user (IP) gets limited requests/sec
-Prevents bots & traffic spikes
-Protects Kafka + DB from overload
-
-👉 Defined in:
-
-⚙️ Gateway Tech Stack
-
-From your pom.xml:
-
-Spring Boot 3
-Java 21
-Spring Cloud Gateway
-Reactive Redis (for rate limiting)
-🔄 Complete Request Flow (Updated)
-✨ Key Features
-🚪 Smart API Gateway
-Central routing layer
-Rate limiting using Redis
-Protects backend services
-🔒 Secure Authentication
-JWT-based stateless authentication
-Role-based access control
-⚡ Real-Time Ticket Updates
-WebSockets (STOMP + SockJS)
-Live inventory sync across users
-📨 Event-Driven Architecture
-Kafka handles order ingestion
-Fully asynchronous pipeline
-🛡️ Fault Tolerance
-Resilience4j Circuit Breaker
-Prevents cascading failures
-📄 PDF Ticket Generation
-RabbitMQ background workers
-Stored in MinIO
-🛠️ Technology Stack
-🎨 Frontend
-React 18
-Vite
-Axios
-STOMP.js + SockJS
-⚙️ Backend Services
-Spring Boot 3
+<p align="center"> <img src="./assets/System-Architecture.png" width="900"/> <br/> <em>End-to-end flow: Gateway → Kafka → Processing → Redis → WebSocket → RabbitMQ → MinIO</em> </p>
+🧰 Tech Stack
+⚙️ Backend
+Java 17+ / Spring Boot
 Spring Security + JWT
-JPA / Hibernate
-OpenPDF
+Spring Data JPA (Hibernate)
 🚪 API Gateway
 Spring Cloud Gateway
-Redis Rate Limiter
-Reactive stack (WebFlux)
+Redis (Rate Limiting - IP based)
 🧱 Infrastructure
-MySQL
-Redis
-Kafka
-RabbitMQ
-MinIO
-🚀 Getting Started
-✅ Prerequisites
-Node.js (v18+)
-Java 17+ (Gateway uses 21 ⚠️)
-MySQL
-Redis
-Kafka
-RabbitMQ
-MinIO
-🔧 Start API Gateway
+MySQL (Primary DB)
+Redis (Caching + Rate Limiting)
+Apache Kafka (Event Streaming)
+RabbitMQ (Background Jobs)
+MinIO (Object Storage)
+🎨 Frontend
+React + Vite
+Axios (JWT interceptors)
+STOMP + SockJS (WebSockets)
+🔄 Request Flow
+Client sends request → API Gateway
+Gateway applies rate limiting (Redis)
+Request forwarded to backend service
+Order pushed to Kafka
+Consumer processes order + updates DB
+Redis cache updated
+WebSocket broadcasts real-time updates
+RabbitMQ triggers PDF generation
+Ticket stored in MinIO
+⚙️ Local Setup
+1️⃣ Start Redis
+docker run -d --name redis-stack -p 6379:6379 redis/redis-stack-server:latest
+2️⃣ Setup MySQL
+CREATE DATABASE flashtix;
+3️⃣ Start API Gateway
 cd flashtix-gateway
 ./mvnw spring-boot:run
-
-📌 Gateway runs before all services
-📌 All requests go through gateway
-
-🔧 Start Backend Services
+4️⃣ Start Backend
 cd flashtix-backend
 ./mvnw spring-boot:run
-💻 Start Frontend
+5️⃣ Start Frontend
 cd flashtix-frontend
 npm install
 npm run dev
-📝 API Routing (via Gateway)
-
-Instead of hitting services directly:
-
-http://localhost:8080/api/...
-
-Gateway routes to:
-
-Auth Service
-Event Service
-Order Service
-🎯 Why This Architecture is Powerful
-🚀 Handles flash-sale scale traffic
-🛡️ Gateway prevents overload BEFORE backend
-🔄 Async processing removes bottlenecks
-🌐 Real-time UX with WebSockets
-📦 Fully scalable microservices-ready design
-🧠 Advanced Concepts Implemented
+📡 API Endpoints
+🔐 Authentication
+POST /api/auth/register
+POST /api/auth/login
+POST /api/auth/refresh
+🎤 Events
+GET  /api/events
+POST /api/events (Admin)
+🎟️ Orders
+POST /api/orders/purchase
+GET  /api/orders/my-tickets
+GET  /api/orders/{id}/download
+🧠 Engineering Highlights
 API Gateway Pattern
 Rate Limiting (Token Bucket via Redis)
 Event-Driven Architecture
 Circuit Breaker Pattern
-CQRS-style async processing
-Distributed caching
+Distributed Caching
+Async Processing Pipeline
+📈 Future Enhancements
+💳 Payment Gateway Integration
+☸️ Kubernetes Deployment
+📊 Monitoring (Prometheus + Grafana)
+🔐 OAuth2 / Keycloak
