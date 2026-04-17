@@ -99,3 +99,80 @@ It ensures:
 git clone https://github.com/YOUR_USERNAME/FlashTix-Live.git
 cd FlashTix-Live
 ```
+
+---
+
+### 2️⃣ Start Infrastructure (Docker Recommended)
+
+- docker run -d -p 6379:6379 redis
+- docker run -d -p 3306:3306 -e MYSQL_ROOT_PASSWORD=root mysql
+
+- (Also start Kafka, RabbitMQ, and MinIO as per your setup)
+
+### 3️⃣ Start API Gateway
+
+- cd flashtix-gateway
+- ./mvnw spring-boot:run
+
+### 4️⃣ Start Backend Services
+
+- cd flashtix-backend
+- ./mvnw spring-boot:run
+
+### 5️⃣ Start Frontend
+
+- cd flashtix-frontend
+- npm install
+- npm run dev
+
+---
+
+### 📡 API Endpoints
+
+### 🔐 Authentication
+
+- POST /api/auth/register
+- POST /api/auth/login
+- POST /api/auth/refresh
+
+### 🎤 Events
+
+- GET /api/events
+- POST /api/events (Admin only)
+
+### 🎟️ Orders & Tickets
+
+- POST /api/orders/purchase
+- GET /api/orders/my-tickets
+- GET /api/orders/{orderId}/download
+
+### 🛡️ Rate Limiting (Gateway)
+
+- Implemented using Redis + Spring Cloud Gateway
+- Based on client IP address
+- Prevents system overload during flash sales
+- Protects Kafka, DB, and backend services
+
+### 🧠 Engineering Concepts Used
+
+- API Gateway Pattern
+- Rate Limiting (Token Bucket Algorithm)
+- Event-Driven Architecture
+- Circuit Breaker Pattern
+- Distributed Caching
+- Asynchronous Processing
+- Microservices Design
+
+---
+
+### 📈 Future Enhancements
+
+### 💳 Payment Gateway Integration (Stripe/Razorpay)
+
+### 🔐 OAuth2 / Keycloak Authentication
+
+### 📊 Monitoring (Prometheus + Grafana)
+
+### ☸️ Kubernetes Deployment
+
+### 🤖 Bot Protection & Rate Intelligence
