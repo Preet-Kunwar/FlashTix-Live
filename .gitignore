@@ -1,0 +1,31 @@
+# Environment variables (Secrets)
+.env
+.env.*
+!.env.example
+
+# IDE / Editor
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Node
+node_modules/
+dist/
+build/
+npm-debug.log
+yarn-error.log
+
+# Java
+target/
+*.jar
+*.war
+*.ear
+*.class
+
+# macOS
+.DS_Store
+
+# Logs
+logs/
+*.log

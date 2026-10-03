@@ -1,0 +1,242 @@
+# ============================================================
+#  FlashTix Live — Infrastructure Services
+#  Run these on Docker. Run Backend/Gateway/Frontend locally.
+#
+#  ✅ All images are 100% free, no login required:
+#     - mysql:8.0              → Docker Hub (free)
+#     - redis:7-alpine         → Docker Hub (free)
+#     - apache/kafka:latest    → Docker Hub (free, official Apache Foundation, KRaft — no Zookeeper!)
+#     - rabbitmq:3-management  → Docker Hub (free)
+#     - chrislusf/seaweedfs    → Docker Hub (free, Apache 2.0, S3-compatible)
+#
+#  ℹ️  MinIO CE stopped publishing free images in Oct 2025.
+#      SeaweedFS is used instead — it is 100% S3-compatible and
+#      works directly with the MinIO Java SDK (path-style requests).
+# ============================================================
+
+services:
+
+  # ──────────────────────────────────────────────────────────
+  #  MySQL 8 — Primary relational database
+  # ──────────────────────────────────────────────────────────
+  mysql:
+    image: mysql:8.0
+    container_name: flashtix-mysql
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+    ports:
+      - "3307:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - flashtix-net
+
+  # ──────────────────────────────────────────────────────────
+  #  Redis 7 — Rate Limiting (Gateway) + Ticket Cache (Backend)
+  # ──────────────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: flashtix-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - flashtix-net
+
+  # ──────────────────────────────────────────────────────────
+  #  Kafka (Official Apache image) — KRaft mode, NO Zookeeper!
+  # ──────────────────────────────────────────────────────────
+  kafka:
+    image: apache/kafka:latest
+    container_name: flashtix-kafka
+    restart: unless-stopped
+    ports:
+      - "9092:9092"   # PLAINTEXT — your local Spring Boot app connects here
+      - "9093:9093"   # CONTROLLER — KRaft internal port
+    environment:
+      # ── KRaft mode (combined broker + controller, no Zookeeper) ──────────
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_NODE_ID: 1
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+
+      # ── Listeners ─────────────────────────────────────────────────────────
+      KAFKA_LISTENERS: INTERNAL://0.0.0.0:29092,EXTERNAL://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:29092,EXTERNAL://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT,CONTROLLER:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+
+      # ── Topic / replication settings for single-node local dev ────────────
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_NUM_PARTITIONS: 3
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+    volumes:
+      - kafka_data:/var/lib/kafka/data
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    networks:
+      - flashtix-net
+
+  # ──────────────────────────────────────────────────────────
+  #  RabbitMQ — Background PDF ticket generation queue
+  # ──────────────────────────────────────────────────────────
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: flashtix-rabbitmq
+    restart: unless-stopped
+    env_file:
+      - .env
+    ports:
+      - "5672:5672"    # AMQP port (used by Spring Boot)
+      - "15672:15672"  # Management UI → http://localhost:15672 (guest/guest)
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS}
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - flashtix-net
+
+  # ──────────────────────────────────────────────────────────
+  #  SeaweedFS — S3-compatible object storage (Apache 2.0)
+  # ──────────────────────────────────────────────────────────
+  seaweedfs:
+    image: chrislusf/seaweedfs:latest
+    container_name: flashtix-seaweedfs
+    restart: unless-stopped
+    command:
+      - server
+      - -s3
+      - -filer
+      - -s3.port=8333
+      - -dir=/data
+      - -volume.max=100
+      - -metricsPort=0
+    ports:
+      - "8333:8333"   # S3 API — Spring Boot connects here
+      - "9333:9333"   # Master web UI → http://localhost:9333
+      - "8888:8888"   # Filer web UI  → http://localhost:8888 (browse PDFs here!)
+    volumes:
+      - seaweedfs_data:/data
+    networks:
+      - flashtix-net
+
+  # ──────────────────────────────────────────────────────────
+  #  Backend App — Main Java Application
+  # ──────────────────────────────────────────────────────────
+  backend:
+    build:
+      context: ./Backend/flashtix
+    container_name: flashtix-backend
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      - MYSQL_HOST=mysql
+      - MYSQL_PORT=3306
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+      - REDIS_HOST=redis
+      - RABBITMQ_HOST=rabbitmq
+      - MINIO_URL=http://seaweedfs:8333
+    ports:
+      - "8080:8080"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - flashtix-net
+
+  # ──────────────────────────────────────────────────────────
+  #  API Gateway App — Spring Cloud Gateway
+  # ──────────────────────────────────────────────────────────
+  gateway:
+    build:
+      context: ./Backend/gateway
+    container_name: flashtix-gateway
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      - REDIS_HOST=redis
+      - BACKEND_HTTP_URL=http://backend:8080
+      - BACKEND_WS_URL=ws://backend:8080
+    ports:
+      - "8081:8081"
+    depends_on:
+      backend:
+        condition: service_started
+      redis:
+        condition: service_healthy
+    networks:
+      - flashtix-net
+
+  # ──────────────────────────────────────────────────────────
+  #  Frontend App — React Vite App
+  # ──────────────────────────────────────────────────────────
+  frontend:
+    build:
+      context: ./Frontend/flashtix-frontend
+    container_name: flashtix-frontend
+    restart: unless-stopped
+    ports:
+      - "5173:80"
+    depends_on:
+      gateway:
+        condition: service_started
+    networks:
+      - flashtix-net
+
+
+# ──────────────────────────────────────────────────────────
+#  Named volumes — data persists across container restarts
+# ──────────────────────────────────────────────────────────
+volumes:
+  mysql_data:
+  redis_data:
+  kafka_data:
+  rabbitmq_data:
+  seaweedfs_data:
+
+# ──────────────────────────────────────────────────────────
+#  Network — all infra services share one bridge network
+# ──────────────────────────────────────────────────────────
+networks:
+  flashtix-net:
+    driver: bridge

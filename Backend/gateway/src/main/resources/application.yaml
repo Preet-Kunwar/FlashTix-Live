@@ -1,0 +1,78 @@
+server:
+  port: 8081
+
+spring:
+  config:
+    import: optional:file:.env[.properties]
+  application:
+    name: flashtix-gateway
+
+  data:
+    redis:
+      host: ${SPRING_REDIS_HOST:localhost}
+      port: ${SPRING_REDIS_PORT:6379}
+      timeout: 2000ms
+
+  cloud:
+    gateway:
+      # ── CORS Strategy ─────────────────────────────────────────────────────────
+      # Both the Gateway AND the Backend need CORS config because:
+      #   - Gateway handles OPTIONS preflight requests at the gateway level
+      #     (so the preflight never even needs to reach the backend)
+      #   - Backend sets CORS headers on actual responses
+      #
+      # This means both will set Access-Control-Allow-Origin on some responses.
+      # The DedupeResponseHeader filter (added to each route below) removes
+      # duplicate headers so the browser always sees exactly ONE value.
+      # ─────────────────────────────────────────────────────────────────────────
+      globalcors:
+        cors-configurations:
+          '[/**]':
+            allowedOrigins:
+              - "http://localhost:5173"
+            allowedHeaders: "*"
+            allowedMethods:
+              - GET
+              - POST
+              - PUT
+              - DELETE
+              - OPTIONS
+              - PATCH
+            allowCredentials: true
+            maxAge: 3600
+
+      routes:
+        # ── Main backend API route ────────────────────────────────────────────
+        - id: flashtix-api
+          uri: ${BACKEND_HTTP_URL:http://localhost:8080}
+          predicates:
+            - Path=/api/**
+          filters:
+            # DedupeResponseHeader strips duplicate CORS headers that arise when
+            # both the Gateway (globalcors above) and the Backend (SecurityConfig)
+            # each set Access-Control-Allow-Origin. Without this you get:
+            # "header contains multiple values ... but only one is allowed"
+            - DedupeResponseHeader=Access-Control-Allow-Credentials Access-Control-Allow-Origin, RETAIN_UNIQUE
+            - name: RequestRateLimiter
+              args:
+                redis-rate-limiter.replenishRate: 10     # tokens added per second
+                redis-rate-limiter.burstCapacity: 20     # max burst allowed
+                redis-rate-limiter.requestedTokens: 1    # cost per request
+                key-resolver: "#{@ipKeyResolver}"
+
+        # ── WebSocket passthrough ─────────────────────────────────────────────
+        # WebSocket (SockJS) connects directly from React to backend port 8080,
+        # bypassing the gateway entirely. This route is here for documentation.
+        - id: flashtix-websocket
+          uri: ${BACKEND_WS_URL:ws://localhost:8080}
+          predicates:
+            - Path=/ws-ticketing/**
+          filters:
+            - DedupeResponseHeader=Access-Control-Allow-Credentials Access-Control-Allow-Origin, RETAIN_UNIQUE
+
+logging:
+  level:
+    root: INFO
+    com.flashtix.gateway: DEBUG
+    org.springframework.cloud.gateway: INFO
+    org.springframework.data.redis: WARN
