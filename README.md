@@ -133,7 +133,3 @@ To see how the components of **FlashTix Live** interact during peak traffic spik
 </div>
 
 ---
-
-<div align="center">
-  <sub>Built with ❤️ to keep concert ticketing fast, fair, and crash-free.</sub>
-</div>
