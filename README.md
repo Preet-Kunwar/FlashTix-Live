@@ -1,6 +1,6 @@
 <div align="center">
 
-  <!-- Animated / Aesthetic Header Badge -->
+
   <img src="https://img.shields.io/badge/⚡_HIGH--CONCURRENCY-EVENT_TICKETING_ENGINE-FF2E93?style=for-the-badge&labelColor=111827" alt="Header Badge" />
 
   <h1>🎟️ 𝙵𝚕𝚊𝚜𝚑𝚃𝚒𝚡 𝙻𝚒𝚟𝚎</h1>
